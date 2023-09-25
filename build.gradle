@@ -17,8 +17,9 @@ repositories {
 }
 
 dependencies {
-    api 'com.google.guava:guava:18.0'
-    api 'ch.qos.logback:logback-classic:1.1.2'
+    implementation 'com.google.guava:guava:18.0'
+    implementation 'ch.qos.logback:logback-classic:1.1.2'
+
     testImplementation 'junit:junit:4.11'
 }
 
@@ -26,14 +27,6 @@ group = 'org.nhnnext'
 version = '1.0'
 description = 'web-application-server'
 java.sourceCompatibility = JavaVersion.VERSION_1_8
-
-publishing {
-    publications {
-        maven(MavenPublication) {
-            from(components.java)
-        }
-    }
-}
 
 tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
