@@ -11,7 +11,8 @@ import org.slf4j.LoggerFactory;
 
 @Slf4j
 public class WebServer {
-    private static final int DEFAULT_PORT = 8080;
+    private static final int DEFAULT_PORT = 8090;
+    private static final UserService userService = new UserService();
 
     public static void main(String args[]) throws Exception {
         int port = 0;
@@ -21,8 +22,6 @@ public class WebServer {
             port = Integer.parseInt(args[0]);
         }
 
-        Map<String, String> members = new HashMap<>();
-
         // 서버소켓을 생성한다. 웹서버는 기본적으로 8080번 포트를 사용한다.
         try (ServerSocket listenSocket = new ServerSocket(port)) {
             log.info("Web Application Server started {} port.", port);
@@ -31,7 +30,7 @@ public class WebServer {
             Socket connection;
             while ((connection = listenSocket.accept()) != null) {
                 log.info("connection: {}", connection);
-                RequestHandler requestHandler = new RequestHandler(connection, members);
+                RequestHandler requestHandler = new RequestHandler(connection, userService);
                 requestHandler.start();
             }
         }

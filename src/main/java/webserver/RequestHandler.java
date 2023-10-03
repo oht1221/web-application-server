@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import model.Status;
 import model.User;
@@ -18,11 +19,15 @@ public class RequestHandler extends Thread {
 
     private Socket connection;
     private final Map<String, String> requestInfo = new HashMap<>();
-    private final Map<String, String> members;
+    private final UserService userService;
 
-    public RequestHandler(Socket connectionSocket, Map<String, String> members) {
+    private StringBuilder responseHeaderBuilder = new StringBuilder();
+    private byte[] responseBody;
+    private Status status;
+
+    public RequestHandler(Socket connectionSocket, UserService userService) {
         this.connection = connectionSocket;
-        this.members = members;
+        this.userService = userService;
     }
 
     public void run() {
@@ -34,53 +39,37 @@ public class RequestHandler extends Thread {
             setRequestInfo(in);
 
             byte[] responseBody = null;
-            Status statusCode = Status.OK;
             switch(this.requestInfo.get("method")) {
                 case "GET":
-                    responseBody = handleGet();
-                    statusCode = Status.OK;
+                    handleGet();
                     break;
                 case "POST":
-                    responseBody = handlePost();
-                    statusCode = Status.REDIRECT;
+                    handlePost();
                     break;
                 default:
                     throw new IllegalStateException("Wrong Request Method");
             }
 
             DataOutputStream dos = new DataOutputStream(out);
-            responseHeader(dos, responseBody.length, statusCode);
-            responseBody(dos, responseBody);
+            writeResponseHeader(dos);
+            writeResponseBody(dos);
         } catch (IOException e) {
             log.error(e.getMessage());
         }
     }
 
-    private void responseHeader(DataOutputStream dos, int lengthOfBodyContent, Status status) {
+    private void writeResponseHeader(DataOutputStream dos) {
         try {
-            dos.writeBytes("HTTP/1.1 " + status.getValue() + " " + status + " \r\n");
-            switch(status.getValue()) {
-                case "200":
-                    dos.writeBytes("Content-Type: text/html;charset=utf-8\r\n");
-                    dos.writeBytes("Content-Length: " + lengthOfBodyContent + "\r\n");
-                    break;
-                case "300":
-                case "301":
-                case "302":
-                    dos.writeBytes("Location: /index.html\r\n");
-                    break;
-                default:
-                    throw new IllegalStateException("Wrong HTTP status code");
-            }
+            dos.writeBytes(responseHeaderBuilder.toString());
             dos.writeBytes("\r\n");
         } catch (IOException e) {
             log.error(e.getMessage());
         }
     }
 
-    private void responseBody(DataOutputStream dos, byte[] body) {
+    private void writeResponseBody(DataOutputStream dos) {
         try {
-            dos.write(body, 0, body.length);
+            dos.write(responseBody, 0, responseBody.length);
             dos.flush();
         } catch (IOException e) {
             log.error(e.getMessage());
@@ -119,14 +108,19 @@ public class RequestHandler extends Thread {
         }
     }
 
-    private byte[] handleGet() throws IOException {
+    private void handleGet() throws IOException {
         String requestPath = getRequestPath();
+
         switch(requestPath) {
             case "/create":
                 setUserInfoFromQueryString(getQueryString());
-                return "Success".getBytes(StandardCharsets.UTF_8);
             default:
-                return Files.readAllBytes(new File("./webapp" + (isRootPath(requestPath) ? "/index.html" : requestPath)).toPath());
+                this.responseBody = Files.readAllBytes(new File("./webapp" + (isRootPath(requestPath) ? "/index.html" : requestPath)).toPath());
+                responseHeaderBuilder.append("HTTP/1.1 200 OK\r\n");
+                responseHeaderBuilder.append(
+                        "Content-Type: text/html;charset=utf-8\r\n" +
+                                "Content-Length: ");
+                responseHeaderBuilder.append(this.responseBody.length);
         }
     }
 
@@ -134,8 +128,24 @@ public class RequestHandler extends Thread {
         String requestPath = getRequestPath();
         switch(requestPath) {
             case "/user/create":
-                saveUser();
-                return "Success".getBytes(StandardCharsets.UTF_8);
+                setUserInfoFromBody().ifPresentOrElse(
+                        (user) -> userService.saveUser(user),
+                        () -> { throw new IllegalArgumentException("Wrong Query String Parameters."); }
+                );
+            case "/user/login":
+                setUserInfoFromBody().ifPresentOrElse(
+                        (user) -> {
+                            boolean login = userService.login(user);
+                            responseHeaderBuilder.append(
+                                    "HTTP/1.1 302 OK\r\n" +
+                                    "Location: ");
+                            responseHeaderBuilder.append(login ? "/index.html\r\n" : "/user/login_failed.html\r\n");
+                            responseHeaderBuilder.append("\r\nSet-Cookie: logined=");
+                            responseHeaderBuilder.append(login ? "true\r\n" : "false\r\n");
+                        },
+                        () -> { throw new IllegalArgumentException("Wrong Query String Parameters."); }
+                );
+                return "".getBytes(StandardCharsets.UTF_8);
             default:
                 return "Failure".getBytes(StandardCharsets.UTF_8);
         }
@@ -157,15 +167,15 @@ public class RequestHandler extends Thread {
         return splitPoint == -1 ? null : uriText.substring(splitPoint + 1);
     }
 
-    private void setUserInfoFromQueryString(String queryString) {
-        if (queryString == null) {
-            return;
+    private Optional<User> setUserInfoFromQueryString(String queryString) {
+        User user = null;
+        if (queryString != null) {
+            Map<String, String> parsedMap = parseQueryString(queryString);
+            user = new User(parsedMap.get("userId"), parsedMap.get("password"), parsedMap.get("name"), parsedMap.get("email"));
         }
-
-        Map<String, String> parsedMap = parseQueryString(queryString);
-
-        User user = new User(parsedMap.get("userId"), parsedMap.get("password"), parsedMap.get("name"), parsedMap.get("email"));
         log.info("setUserInfo : {}", user);
+
+        return Optional.ofNullable(user);
     }
 
     private Map<String, String> parseQueryString(String queryString) {
@@ -180,10 +190,11 @@ public class RequestHandler extends Thread {
         return parsedMap;
     }
 
-    private void saveUser()
-    private void setUserInfoFromBody() {
+    private Optional<User> setUserInfoFromBody() {
         if ("application/x-www-form-urlencoded".equals(this.requestInfo.get("Content-Type"))) {
-            setUserInfoFromQueryString(this.requestInfo.get("body"));
+            return setUserInfoFromQueryString(this.requestInfo.get("body"));
         }
+
+        return Optional.empty();
     }
 }
