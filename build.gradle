@@ -6,7 +6,6 @@
 
 plugins {
     id 'java-library'
-    id 'maven-publish'
 }
 
 repositories {
@@ -16,6 +15,10 @@ repositories {
     }
 }
 
+test {
+    useJUnitPlatform()
+}
+
 dependencies {
     implementation 'com.google.guava:guava:32.1.2-jre'
     implementation 'ch.qos.logback:logback-classic:1.4.1'
@@ -23,13 +26,15 @@ dependencies {
     implementation 'org.projectlombok:lombok:1.18.22'
     annotationProcessor 'org.projectlombok:lombok:1.18.22'
 
-    testImplementation 'junit:junit:4.11'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.22'
 }
 
 group = 'org.nhnnext'
 version = '1.0'
 description = 'web-application-server'
-java.sourceCompatibility = JavaVersion.VERSION_1_8
+java.sourceCompatibility = JavaVersion.VERSION_17
 
 tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'

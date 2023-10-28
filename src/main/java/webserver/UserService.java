@@ -4,8 +4,7 @@ import db.DataBase;
 import lombok.extern.slf4j.Slf4j;
 import model.User;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Collection;
 
 @Slf4j
 public class UserService {
@@ -25,10 +24,10 @@ public class UserService {
       return false;
     }
 
-    if (!foundUser.getPassword().equals(user.getPassword())) {
-      return false;
-    }
+    return foundUser.getPassword().equals(user.getPassword());
+  }
 
-    return true;
+  public Collection<User> getAllUsers() {
+    return DataBase.findAll();
   }
 }

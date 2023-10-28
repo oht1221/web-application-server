@@ -1,0 +1,5 @@
+GET /user/create?userId=oht1221&password=123123&name=oht1221&email=oht1221@test.com HTTP/1.1
+Host: localhost:8090
+Connection: keep-alive
+Accept: */*
+
