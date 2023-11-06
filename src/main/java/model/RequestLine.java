@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import util.HttpRequestUtils;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @Slf4j
@@ -11,7 +12,7 @@ import java.util.Map;
 public class RequestLine {
   private HttpMethod method;
   private String path;
-  private Map<String, String> parameters;
+  private Map<String, String> parameters = new HashMap<>();
 
   public RequestLine(String requestLine) {
     log.info("request line: {}", requestLine);

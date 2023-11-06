@@ -16,35 +16,30 @@ import java.util.Map;
 
 @Slf4j
 public class HttpRequest {
-  private HttpMethod method;
-  private String path;
-  private Map<String, String> parameters = new HashMap<>();
-  private Map<String, String> headers;
+  private RequestLine requestLine;
+  private final Map<String, String> headers = new HashMap<>();
 
   public HttpRequest(InputStream in) {
     BufferedReader br = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
-    Map<String, String> headers = new HashMap<>();
 
     try {
       String line = br.readLine();
-      RequestLine requestLine = new RequestLine(line);
-      this.method = requestLine.getMethod();
-      this.parameters = requestLine.getParameters();
+      this.requestLine = new RequestLine(line);
 
       // 요청 헤더 n
       line = br.readLine();
       while (line != null && !"".equals(line)) {
         log.debug("header: {}", line);
         String[] tokens = line.split(":");
-        headers.put(tokens[0].trim(), tokens[1].trim());
+        this.headers.put(tokens[0].trim(), tokens[1].trim());
         line = br.readLine();
       }
 
       // 요청 body
-      if (this.method.isPost()) {
-        String body = IOUtils.readData(br, Integer.parseInt(headers.get("Content-Length")));
+      if (this.requestLine.getMethod().isPost()) {
+        String body = IOUtils.readData(br, Integer.parseInt(this.headers.get("Content-Length")));
         log.debug(body);
-        this.parameters.putAll(HttpRequestUtils.parseQueryString(body));
+        this.requestLine.getParameters().putAll(HttpRequestUtils.parseQueryString(body));
       }
 
     } catch (IOException e) {
@@ -57,7 +52,7 @@ public class HttpRequest {
   }
 
   public HttpMethod getMethod() {
-    return this.method;
+    return this.requestLine.getMethod();
   }
 
   public String getHeader(String key) {
@@ -65,11 +60,11 @@ public class HttpRequest {
   }
 
   public String getParameter(String key) {
-    return this.parameters.get(key);
+    return this.requestLine.getParameters().get(key);
   }
 
   public String getPath() {
-    return this.path;
+    return this.requestLine.getPath();
   }
 
   private Map<String, String> parseQueryString(String queryString) {

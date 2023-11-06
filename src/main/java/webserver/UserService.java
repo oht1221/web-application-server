@@ -8,6 +8,13 @@ import java.util.Collection;
 
 @Slf4j
 public class UserService {
+  private static UserService object;
+  public static UserService create() {
+    if (object == null) {
+      object = new UserService();
+    }
+    return object;
+  }
 
   public User saveUser(User user) {
     if (DataBase.findUserById(user.getUserId()) != null) {

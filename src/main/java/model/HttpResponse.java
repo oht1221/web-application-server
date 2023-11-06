@@ -17,7 +17,6 @@ public class HttpResponse {
   private OutputStream os;
   private Status status;
   private Map<String, String> headers = new HashMap<>();
-  private byte[] body;
 
   public HttpResponse(OutputStream os) {
     this.os = new DataOutputStream(os);
@@ -27,59 +26,62 @@ public class HttpResponse {
     return this.os;
   }
 
+  public void addHeader(String key, String value) {
+    this.headers.put(key, value);
+  }
+
   public void forward(String path) {
     try {
       byte[] body = Files.readAllBytes(new File("./webapp" + path).toPath());
       String[] pathTokens = path.split("[.]");
       String resourceType = path.split("[.]")[pathTokens.length - 1];
 
-//      forwardBody(path);
-      headers.put("Content-Type", "text/" + resourceType + ";charset=utf-8");
-      setStatus(Status.OK);
+      switch (resourceType) {
+        case "css" -> headers.put("Content-Type", "text/css");
+        case "javascript" -> headers.put("Content-Type", "application/javascript");
+        case "html" -> headers.put("Content-Type", "text/html;charset=utf-8");
+      }
 
-      response200Header(body.length);
+      response200Header();
       responseBody(body);
-//      writeStatus();
-//      writeHeaders();
-//      writeBody();
     } catch (IOException e) {
       log.error(e.getMessage());
     }
   }
 
-  public void forwardBody() {}
-
-  public void addHeader(String key, String value) {
-    this.headers.put(key, value);
-  }
-
-  public void forwardBody(String body) throws IOException {
-    setStatus(Status.OK);
+  public void forwardBody(String body) {
     this.headers.put("Content-Type", "text/html;charset=utf-8");
-
-    response200Header(body.length());
+    this.headers.put("Content-Length", String.valueOf(body.length()));
+    response200Header();
     responseBody(body.getBytes());
   }
 
-  public void sendRedirect(String redirectLocation) {
-    setStatus(Status.REDIRECT);
-    addHeader("Location", redirectLocation);
-
-    writeStatus();
-    writeHeaders();
+  public void sendRedirect(String location) {
+    try {
+      this.os.write("HTTP/1.1 302 FOUND \r\n".getBytes());
+      processHeader();
+      this.os.write(("Location: " + location + " \r\n").getBytes());
+    } catch (IOException e) {
+      log.error(e.getMessage());
+    }
   }
 
-  private void response200Header(int length) {
-      this.headers.put("Content-Length", String.valueOf(length));
+  private void response200Header() {
+    try {
+      this.os.write("HTTP/1.1 200 OK \r\n".getBytes());
       processHeader();
+      //body 전 공백 한 줄
+      os.write("\r\n".getBytes());
 
-      writeStatus();
-      writeHeaders();
+    } catch (IOException e) {
+      log.error(e.getMessage());
+    }
   }
 
   private void responseBody(byte[] body) {
     try {
       os.write(body);
+      os.write("\r\n".getBytes());
       os.flush();
     } catch (IOException e) {
       log.error(e.getMessage());
@@ -115,15 +117,6 @@ public class HttpResponse {
       }
       //body 전 공백 한 줄
       os.write("\r\n".getBytes());
-    } catch (IOException e) {
-      log.error(e.getMessage());
-    }
-  }
-
-  private void writeBody() {
-    try {
-      this.os.write(this.body);
-      this.os.flush();
     } catch (IOException e) {
       log.error(e.getMessage());
     }

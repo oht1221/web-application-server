@@ -16,16 +16,9 @@ import util.HttpRequestUtils;
 public class RequestHandler extends Thread {
     private static final Logger log = LoggerFactory.getLogger(RequestHandler.class);
     private Socket connection;
-    private final Map<String, Controller> CONTROLLER_MAP;
 
     public RequestHandler(Socket connectionSocket, UserService userService) {
         this.connection = connectionSocket;
-        this.CONTROLLER_MAP = Map.of(
-                "/user/list", UserListController.create(userService),
-                "/user/login", UserLoginController.create(userService),
-                "/user/create", UserCreateController.create(userService)
-                ,"NOT_FOUND", NotFoundController.create()
-        );
     }
 
     public void run() {
@@ -36,19 +29,26 @@ public class RequestHandler extends Thread {
             // TODO 사용자 요청에 대한 처리는 이 곳에 구현하면 된다.
             HttpRequest request = new HttpRequest(in);
             HttpResponse response = new HttpResponse(out);
+            String path = getDefaultPath(request.getPath());
 
-            String path = "/".equals(request.getPath()) || request.getPath().length() == 0 ? "/index.html" : request.getPath();
             // static resources
-            if (path.endsWith(".js") || path.endsWith(".css") || path.endsWith(".html")) {
+            if (isStatic(path)) {
                 response.forward(path);
                 return;
             }
 
-            Controller controller = CONTROLLER_MAP.get(path) != null ? CONTROLLER_MAP.get(path) : CONTROLLER_MAP.get("NOT_FOUND");
-            controller.service(request, response);
+            RequestMapping.getController(path).service(request, response);
 
         } catch (IOException e) {
             log.error(e.getMessage());
         }
+    }
+
+    private String getDefaultPath(String path) {
+        return "/".equals(path) || path.length() == 0 ? "/index.html" : path;
+    }
+
+    private boolean isStatic(String path) {
+        return path.endsWith(".js") || path.endsWith(".css") || path.endsWith(".html");
     }
 }
